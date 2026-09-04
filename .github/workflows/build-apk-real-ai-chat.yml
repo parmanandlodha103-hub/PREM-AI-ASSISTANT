@@ -280,10 +280,10 @@ jobs:
               }
           }
           EOF
-
-      - name: Build APK
-        run: ./gradle-8.10.2/bin/gradle assembleDebug --no-daemon
-
+          - name: Build APK
+            env:
+             BACKEND_URL: ${{ secrets.PREM_BACKEND_URL }}
+           run: ./gradle-8.10.2/bin/gradle assembleDebug --no-daemon
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
