@@ -1,0 +1,290 @@
+name: Build Prem AI Assistant - Real AI Chat
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Download Gradle
+        run: |
+          curl -L -o gradle.zip https://services.gradle.org/distributions/gradle-8.10.2-bin.zip
+          unzip -q gradle.zip
+
+      - name: Create Android project
+        shell: bash
+        env:
+          BACKEND_URL: ${{ secrets.PREM_BACKEND_URL }}
+        run: |
+          set -e
+          if [ -z "$BACKEND_URL" ]; then
+            echo "PREM_BACKEND_URL GitHub Secret is missing."
+            echo "Create it with your deployed backend URL, for example https://your-service.onrender.com"
+            exit 1
+          fi
+
+          mkdir -p app/src/main/java/com/prem/aiassistant
+          mkdir -p app/src/main/res/values
+
+          cat > gradle.properties <<'EOF'
+          android.useAndroidX=true
+          android.enableJetifier=true
+          org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
+          EOF
+
+          cat > settings.gradle.kts <<'EOF'
+          pluginManagement {
+              repositories {
+                  google()
+                  mavenCentral()
+                  gradlePluginPortal()
+              }
+          }
+          dependencyResolutionManagement {
+              repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+          }
+          rootProject.name = "PremAIAssistant"
+          include(":app")
+          EOF
+
+          cat > build.gradle.kts <<'EOF'
+          plugins {
+              id("com.android.application") version "8.7.3" apply false
+              id("org.jetbrains.kotlin.android") version "2.0.21" apply false
+          }
+          EOF
+
+          cat > app/build.gradle.kts <<'EOF'
+          plugins {
+              id("com.android.application")
+              id("org.jetbrains.kotlin.android")
+          }
+
+          android {
+              namespace = "com.prem.aiassistant"
+              compileSdk = 35
+
+              defaultConfig {
+                  applicationId = "com.prem.aiassistant"
+                  minSdk = 24
+                  targetSdk = 35
+                  versionCode = 3
+                  versionName = "3.0"
+                  buildConfigField("String", "BACKEND_URL", "\"${System.getenv("BACKEND_URL")}\"")
+              }
+
+              buildFeatures {
+                  buildConfig = true
+              }
+
+              compileOptions {
+                  sourceCompatibility = JavaVersion.VERSION_17
+                  targetCompatibility = JavaVersion.VERSION_17
+              }
+
+              kotlinOptions {
+                  jvmTarget = "17"
+              }
+          }
+
+          kotlin {
+              jvmToolchain(17)
+          }
+
+          dependencies {
+              implementation("androidx.core:core-ktx:1.15.0")
+              implementation("androidx.appcompat:appcompat:1.7.0")
+              implementation("com.google.android.material:material:1.12.0")
+          }
+          EOF
+
+          cat > app/src/main/res/values/strings.xml <<'EOF'
+          <resources><string name="app_name">Prem AI Assistant</string></resources>
+          EOF
+
+          cat > app/src/main/res/values/styles.xml <<'EOF'
+          <resources>
+              <style name="AppTheme" parent="Theme.Material3.DayNight.NoActionBar">
+                  <item name="android:fontFamily">sans</item>
+                  <item name="android:statusBarColor">#111111</item>
+                  <item name="android:navigationBarColor">#111111</item>
+              </style>
+          </resources>
+          EOF
+
+          cat > app/src/main/AndroidManifest.xml <<'EOF'
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+              <uses-permission android:name="android.permission.INTERNET"/>
+              <application
+                  android:theme="@style/AppTheme"
+                  android:label="@string/app_name"
+                  android:allowBackup="true"
+                  android:supportsRtl="true">
+                  <activity
+                      android:name=".MainActivity"
+                      android:screenOrientation="portrait"
+                      android:exported="true">
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN"/>
+                          <category android:name="android.intent.category.LAUNCHER"/>
+                      </intent-filter>
+                  </activity>
+              </application>
+          </manifest>
+          EOF
+
+          cat > app/src/main/java/com/prem/aiassistant/MainActivity.kt <<'EOF'
+          package com.prem.aiassistant
+
+          import android.graphics.Color
+          import android.os.Bundle
+          import android.view.Gravity
+          import android.view.View
+          import android.widget.*
+          import androidx.appcompat.app.AppCompatActivity
+          import org.json.JSONObject
+          import java.net.HttpURLConnection
+          import java.net.URL
+          import kotlin.concurrent.thread
+
+          class MainActivity : AppCompatActivity() {
+              private lateinit var content: LinearLayout
+              private fun dp(v:Int)= (v*resources.displayMetrics.density).toInt()
+
+              private fun tv(s:String, size:Float, color:Int=Color.WHITE)=TextView(this).apply{
+                  text=s; textSize=size; setTextColor(color)
+                  setPadding(dp(16),dp(10),dp(16),dp(10))
+              }
+
+              private fun btn(s:String, action:()->Unit)=Button(this).apply{
+                  text=s; textSize=15f; isAllCaps=false; setOnClickListener{action()}
+                  layoutParams=LinearLayout.LayoutParams(-1,dp(54)).apply{
+                      setMargins(dp(12),dp(7),dp(12),dp(7))
+                  }
+              }
+
+              override fun onCreate(b:Bundle?){super.onCreate(b); home()}
+
+              private fun base(title:String){
+                  val root=LinearLayout(this).apply{
+                      orientation=LinearLayout.VERTICAL
+                      setBackgroundColor(Color.rgb(18,18,18))
+                  }
+                  val bar=LinearLayout(this).apply{gravity=Gravity.CENTER_VERTICAL}
+                  val back=tv("‹",34f).apply{setOnClickListener{home()}}
+                  bar.addView(back,LinearLayout.LayoutParams(dp(55),dp(60)))
+                  bar.addView(tv(title,21f),LinearLayout.LayoutParams(0,dp(60),1f))
+                  root.addView(bar)
+                  content=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL}
+                  root.addView(content,LinearLayout.LayoutParams(-1,0,1f))
+                  setContentView(root)
+              }
+
+              private fun home(){
+                  base("Prem AI Assistant")
+                  content.addView(tv("👋 Namaste!",28f))
+                  content.addView(tv("Aapka personal AI assistant",17f,Color.LTGRAY))
+                  content.addView(btn("🤖  AI Chat"){chat()})
+                  content.addView(btn("🎬  AI Reel Maker"){reel()})
+                  content.addView(btn("🎥  AI Video Maker"){video()})
+              }
+
+              private fun chat(){
+                  base("🤖 AI Chat")
+                  val messages=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL}
+                  val scroll=ScrollView(this).apply{addView(messages)}
+                  content.addView(scroll,LinearLayout.LayoutParams(-1,0,1f))
+                  messages.addView(tv("Prem AI: Namaste! 👋\\nAap mujhse Hindi ya Hinglish me kuch bhi pooch sakte hain.",16f))
+
+                  val row=LinearLayout(this)
+                  val input=EditText(this).apply{
+                      hint="Message likhiye..."
+                      setHintTextColor(Color.GRAY); setTextColor(Color.WHITE); setSingleLine(true)
+                  }
+                  val send=Button(this).apply{text="Send";isAllCaps=false}
+                  row.addView(input,LinearLayout.LayoutParams(0,dp(56),1f))
+                  row.addView(send,LinearLayout.LayoutParams(dp(90),dp(56)))
+                  content.addView(row)
+
+                  send.setOnClickListener{
+                      val q=input.text.toString().trim()
+                      if(q.isEmpty()) return@setOnClickListener
+                      messages.addView(tv("You: $q",16f))
+                      input.text.clear()
+                      send.isEnabled=false
+                      messages.addView(tv("Prem AI: Soch raha hoon…",16f,Color.LTGRAY))
+                      scroll.post{scroll.fullScroll(View.FOCUS_DOWN)}
+
+                      thread {
+                          val result = callBackend(q)
+                          runOnUiThread {
+                              if (messages.childCount > 0) messages.removeViewAt(messages.childCount - 1)
+                              messages.addView(tv("Prem AI: $result",16f,Color.LTGRAY))
+                              send.isEnabled=true
+                              scroll.post{scroll.fullScroll(View.FOCUS_DOWN)}
+                          }
+                      }
+                  }
+              }
+
+              private fun callBackend(message:String):String {
+                  try {
+                      val base = BuildConfig.BACKEND_URL.trimEnd('/')
+                      val conn = (URL("$base/chat").openConnection() as HttpURLConnection)
+                      conn.requestMethod="POST"
+                      conn.connectTimeout=20000
+                      conn.readTimeout=60000
+                      conn.setRequestProperty("Content-Type","application/json")
+                      conn.doOutput=true
+                      val body=JSONObject().put("message",message).toString()
+                      conn.outputStream.use{it.write(body.toByteArray(Charsets.UTF_8))}
+                      val text=conn.inputStream.bufferedReader().use{it.readText()}
+                      val obj=JSONObject(text)
+                      return obj.optString("reply").ifBlank{obj.optString("error","Unknown error")}
+                  } catch(e:Exception) {
+                      return "Connection error: ${e.message ?: "backend se connection nahi ho paaya"}"
+                  }
+              }
+
+              private fun reel(){
+                  base("🎬 AI Reel Maker")
+                  content.addView(tv("AI Reel Maker",25f))
+                  content.addView(tv("Story ya idea likhiye. Next update me isi backend se reel planning aur generation workflow connect kiya ja sakta hai.",16f,Color.LTGRAY))
+                  val e=EditText(this).apply{hint="Example: Hanuman ji ki emotional story";setHintTextColor(Color.GRAY);setTextColor(Color.WHITE);minLines=4;gravity=Gravity.TOP}
+                  content.addView(e,LinearLayout.LayoutParams(-1,dp(130)).apply{setMargins(dp(12),dp(10),dp(12),dp(10))})
+                  content.addView(btn("✨ Reel Plan Banaye"){Toast.makeText(this,"Reel workflow ready.",Toast.LENGTH_LONG).show()})
+              }
+
+              private fun video(){
+                  base("🎥 AI Video Maker")
+                  content.addView(tv("AI Video Maker",25f))
+                  content.addView(tv("Prompt se video workflow yahan se start hoga.",16f,Color.LTGRAY))
+                  val e=EditText(this).apply{hint="Video prompt likhiye...";setHintTextColor(Color.GRAY);setTextColor(Color.WHITE);minLines=4;gravity=Gravity.TOP}
+                  content.addView(e,LinearLayout.LayoutParams(-1,dp(130)).apply{setMargins(dp(12),dp(10),dp(12),dp(10))})
+                  content.addView(btn("🎥 Video Generate"){Toast.makeText(this,"Video workflow ready.",Toast.LENGTH_LONG).show()})
+              }
+          }
+          EOF
+
+      - name: Build APK
+        run: ./gradle-8.10.2/bin/gradle assembleDebug --no-daemon
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Prem-AI-Assistant-Real-AI-Chat-APK
+          path: app/build/outputs/apk/debug/app-debug.apk
