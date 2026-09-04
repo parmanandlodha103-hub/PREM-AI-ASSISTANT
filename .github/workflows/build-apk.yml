@@ -26,7 +26,8 @@ jobs:
         run: |
           mkdir -p app/src/main/java/com/prem/aiassistant
           mkdir -p app/src/main/res/values
-
+            echo "android.useAndroidX=true" > gradle.properties
+          echo "android.enableJetifier=true" >> gradle.properties
           cat > settings.gradle.kts <<'EOF'
           pluginManagement {
               repositories {
