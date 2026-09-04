@@ -1,0 +1,90 @@
+name: Build Prem AI Assistant APK
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Create Android project
+        shell: bash
+        run: |
+          set -e
+          mkdir -p app/src/main/java/com/prem/aiassistant app/src/main/res/values
+          cat > settings.gradle.kts <<'EOF'
+          pluginManagement { repositories { google(); mavenCentral(); gradlePluginPortal() } }
+          dependencyResolutionManagement { repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS); repositories { google(); mavenCentral() } }
+          rootProject.name="PremAIAssistant"; include(":app")
+          EOF
+          cat > build.gradle.kts <<'EOF'
+          plugins {
+            id("com.android.application") version "8.7.3" apply false
+            id("org.jetbrains.kotlin.android") version "2.0.21" apply false
+          }
+          EOF
+          cat > app/build.gradle.kts <<'EOF'
+          plugins { id("com.android.application"); id("org.jetbrains.kotlin.android") }
+          android {
+            namespace="com.prem.aiassistant"; compileSdk=35
+            defaultConfig { applicationId="com.prem.aiassistant"; minSdk=24; targetSdk=35; versionCode=1; versionName="1.0" }
+          }
+          dependencies {
+            implementation("androidx.core:core-ktx:1.15.0")
+            implementation("androidx.appcompat:appcompat:1.7.0")
+            implementation("com.google.android.material:material:1.12.0")
+          }
+          EOF
+          cat > app/src/main/res/values/styles.xml <<'EOF'
+          <resources><style name="AppTheme" parent="Theme.Material3.DayNight.NoActionBar"><item name="android:fontFamily">sans</item><item name="android:colorAccent">#6D4AFF</item></style></resources>
+          EOF
+          cat > app/src/main/AndroidManifest.xml <<'EOF'
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+            <uses-permission android:name="android.permission.INTERNET"/>
+            <application android:theme="@style/AppTheme" android:label="Prem AI Assistant">
+              <activity android:name=".MainActivity" android:screenOrientation="portrait" android:exported="true">
+                <intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter>
+              </activity>
+            </application>
+          </manifest>
+          EOF
+          cat > app/src/main/java/com/prem/aiassistant/MainActivity.kt <<'EOF'
+          package com.prem.aiassistant
+          import android.app.*; import android.os.*; import android.graphics.Color; import android.view.Gravity; import android.widget.*
+          class MainActivity:Activity(){
+            val purple=Color.rgb(109,74,255)
+            fun b(t:String,f:()->Unit)=Button(this).apply{text=t;isAllCaps=false;setTextColor(Color.WHITE);setBackgroundColor(purple);setOnClickListener{f()}}
+            fun base()=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(24,32,24,24)}
+            override fun onCreate(x:Bundle?){super.onCreate(x);home()}
+            fun home(){val l=base();l.addView(TextView(this).apply{text="Prem AI Assistant";textSize=30f;gravity=Gravity.CENTER});l.addView(TextView(this).apply{text="AI Chat • Reel Maker • Video Maker";gravity=Gravity.CENTER;setPadding(0,8,0,24)})
+              l.addView(b("🤖 AI Chat"){screen("AI Chat","अपना सवाल या काम लिखें…")})
+              l.addView(b("📱 AI Reel Maker"){screen("Reel Maker","जैसे: हनुमान जी की 30 सेकंड की दमदार Reel बनाओ")})
+              l.addView(b("🎬 AI Video Maker"){screen("Video Maker","जैसे: इस कहानी को cinematic video में बदलो")})
+              setContentView(l)}
+            fun screen(title:String,hint:String){val l=base();l.addView(b("← Home"){home()});l.addView(TextView(this).apply{text=title;textSize=27f;setPadding(0,18,0,15)});val e=EditText(this).apply{this.hint=hint;minLines=5;gravity=1};val o=TextView(this).apply{textSize=16f;setPadding(0,20,0,0)};l.addView(e);l.addView(b("✨ Generate"){val q=e.text.toString();o.text=if(q.isBlank())"पहले अपना prompt लिखें।" else "आपका prompt तैयार है:\\n\\n$q\\n\\nReal AI generation चालू करने के लिए secure backend/API जोड़ें।"});l.addView(o);setContentView(l)}
+          }
+          EOF
+
+      - name: Install Gradle
+        run: |
+          curl -L -o gradle.zip https://services.gradle.org/distributions/gradle-8.10.2-bin.zip
+          unzip -q gradle.zip
+          echo "$PWD/gradle-8.10.2/bin" >> "$GITHUB_PATH"
+
+      - name: Build debug APK
+        run: gradle assembleDebug --no-daemon
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Prem-AI-Assistant-APK
+          path: app/build/outputs/apk/debug/app-debug.apk
