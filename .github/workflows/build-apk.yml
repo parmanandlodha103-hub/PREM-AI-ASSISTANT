@@ -23,11 +23,19 @@ jobs:
           unzip -q gradle.zip
 
       - name: Create Android project
+        shell: bash
         run: |
+          set -e
+
           mkdir -p app/src/main/java/com/prem/aiassistant
           mkdir -p app/src/main/res/values
-            echo "android.useAndroidX=true" > gradle.properties
-          echo "android.enableJetifier=true" >> gradle.properties
+
+          cat > gradle.properties <<'EOF'
+          android.useAndroidX=true
+          android.enableJetifier=true
+          org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
+          EOF
+
           cat > settings.gradle.kts <<'EOF'
           pluginManagement {
               repositories {
@@ -66,6 +74,15 @@ jobs:
               namespace = "com.prem.aiassistant"
               compileSdk = 35
 
+              compileOptions {
+                  sourceCompatibility = JavaVersion.VERSION_17
+                  targetCompatibility = JavaVersion.VERSION_17
+              }
+
+              kotlinOptions {
+                  jvmTarget = "17"
+              }
+
               defaultConfig {
                   applicationId = "com.prem.aiassistant"
                   minSdk = 24
@@ -73,6 +90,10 @@ jobs:
                   versionCode = 1
                   versionName = "1.0"
               }
+          }
+
+          kotlin {
+              jvmToolchain(17)
           }
 
           dependencies {
@@ -83,23 +104,26 @@ jobs:
           EOF
 
           cat > app/src/main/res/values/styles.xml <<'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
           <resources>
-              <style name="AppTheme"
-                  parent="Theme.Material3.DayNight.NoActionBar">
+              <style name="AppTheme" parent="Theme.Material3.DayNight.NoActionBar">
                   <item name="android:fontFamily">sans</item>
-                  <item name="android:colorAccent">#6D4AFF</item>
+                  <item name="android:colorAccent">#6750A4</item>
               </style>
           </resources>
           EOF
 
           cat > app/src/main/AndroidManifest.xml <<'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-              <uses-permission android:name="android.permission.INTERNET"/>
+              <uses-permission android:name="android.permission.INTERNET" />
 
               <application
                   android:theme="@style/AppTheme"
-                  android:label="Prem AI Assistant">
+                  android:label="Prem AI Assistant"
+                  android:allowBackup="true"
+                  android:supportsRtl="true">
 
                   <activity
                       android:name=".MainActivity"
@@ -107,37 +131,45 @@ jobs:
                       android:exported="true">
 
                       <intent-filter>
-                          <action android:name="android.intent.action.MAIN"/>
-                          <category android:name="android.intent.category.LAUNCHER"/>
+                          <action android:name="android.intent.action.MAIN" />
+                          <category android:name="android.intent.category.LAUNCHER" />
                       </intent-filter>
 
                   </activity>
+
               </application>
+
           </manifest>
           EOF
 
           cat > app/src/main/java/com/prem/aiassistant/MainActivity.kt <<'EOF'
           package com.prem.aiassistant
 
-          import android.app.Activity
           import android.os.Bundle
           import android.graphics.Color
           import android.view.Gravity
-          import android.widget.*
+          import android.widget.Button
+          import android.widget.LinearLayout
+          import android.widget.TextView
+          import androidx.appcompat.app.AppCompatActivity
 
-          class MainActivity : Activity() {
+          class MainActivity : AppCompatActivity() {
 
-              private val purple = Color.rgb(109, 74, 255)
-
-              private fun button(text: String, action: () -> Unit) =
-                  Button(this).apply {
+              private fun button(text: String, action: () -> Unit): Button {
+                  return Button(this).apply {
                       this.text = text
-                      isAllCaps = false
-                      textSize = 16f
                       setTextColor(Color.WHITE)
-                      setBackgroundColor(purple)
                       setOnClickListener { action() }
                   }
+              }
+
+              private fun base(): LinearLayout {
+                  return LinearLayout(this).apply {
+                      orientation = LinearLayout.VERTICAL
+                      gravity = Gravity.CENTER
+                      setPadding(24, 32, 24, 32)
+                  }
+              }
 
               override fun onCreate(savedInstanceState: Bundle?) {
                   super.onCreate(savedInstanceState)
@@ -145,86 +177,67 @@ jobs:
               }
 
               private fun home() {
-                  val layout = LinearLayout(this).apply {
-                      orientation = LinearLayout.VERTICAL
+                  val layout = base()
+
+                  val title = TextView(this).apply {
+                      text = "🤖 Prem AI Assistant"
+                      textSize = 30f
                       gravity = Gravity.CENTER
-                      setPadding(24, 40, 24, 24)
+                      setTextColor(Color.BLACK)
                   }
 
                   layout.addView(
-                      TextView(this).apply {
-                          text = "Prem AI Assistant"
-                          textSize = 30f
-                          gravity = Gravity.CENTER
+                      title,
+                      LinearLayout.LayoutParams(
+                          LinearLayout.LayoutParams.MATCH_PARENT,
+                          LinearLayout.LayoutParams.WRAP_CONTENT
+                      )
+                  )
+
+                  layout.addView(
+                      button("🤖 AI Chat") {
+                          screen("AI Chat", "आप AI से सवाल पूछ सकते हैं।")
                       }
                   )
 
                   layout.addView(
-                      TextView(this).apply {
-                          text = "🤖 AI Chat • 🎬 Video • 📱 Reels"
-                          textSize = 16f
-                          gravity = Gravity.CENTER
-                          setPadding(0, 12, 0, 30)
+                      button("🎬 AI Reel Maker") {
+                          screen("AI Reel Maker", "यहाँ से अपनी 30 सेकंड की शानदार Reel बनाएं।")
                       }
                   )
 
-                  layout.addView(button("🤖 AI Chat") {
-                      screen("AI Chat", "अपना सवाल लिखें…")
-                  })
-
-                  layout.addView(button("📱 AI Reel Maker") {
-                      screen("Reel Maker", "जैसे: हनुमान जी की दमदार Reel बनाओ")
-                  })
-
-                  layout.addView(button("🎬 AI Video Maker") {
-                      screen("Video Maker", "अपना video idea लिखें…")
-                  })
+                  layout.addView(
+                      button("🎥 AI Video Maker") {
+                          screen("AI Video Maker", "अपनी कहानी को cinematic video में बदलें।")
+                      }
+                  )
 
                   setContentView(layout)
               }
 
-              private fun screen(title: String, hint: String) {
+              private fun screen(title: String, message: String) {
+                  val layout = base()
 
-                  val layout = LinearLayout(this).apply {
-                      orientation = LinearLayout.VERTICAL
-                      setPadding(24, 35, 24, 24)
+                  val heading = TextView(this).apply {
+                      text = title
+                      textSize = 28f
+                      gravity = Gravity.CENTER
                   }
 
-                  layout.addView(button("← Home") { home() })
-
-                  layout.addView(
-                      TextView(this).apply {
-                          text = title
-                          textSize = 27f
-                          setPadding(0, 20, 0, 15)
-                      }
-                  )
-
-                  val input = EditText(this).apply {
-                      this.hint = hint
-                      minLines = 5
-                      gravity = Gravity.TOP
+                  val text = TextView(this).apply {
+                      this.text = message
+                      textSize = 18f
+                      gravity = Gravity.CENTER
+                      setPadding(10, 30, 10, 30)
                   }
 
-                  val result = TextView(this).apply {
-                      textSize = 16f
-                      setPadding(0, 20, 0, 0)
+                  val back = button("⬅️ वापस") {
+                      home()
                   }
 
-                  layout.addView(input)
-
-                  layout.addView(button("✨ Generate") {
-                      val text = input.text.toString()
-
-                      result.text =
-                          if (text.isBlank()) {
-                              "पहले अपना prompt लिखें।"
-                          } else {
-                              "Prem AI Assistant\\n\\nआपका prompt:\\n$text\\n\\nAI generation के लिए backend जोड़ना होगा।"
-                          }
-                  })
-
-                  layout.addView(result)
+                  layout.addView(heading)
+                  layout.addView(text)
+                  layout.addView(back)
 
                   setContentView(layout)
               }
