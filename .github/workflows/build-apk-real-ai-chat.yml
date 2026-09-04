@@ -6,7 +6,9 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
+
       - name: Checkout
         uses: actions/checkout@v4
 
@@ -29,10 +31,11 @@ jobs:
           set -e
 
           if [ -z "$BACKEND_URL" ]; then
-            echo "PREM_BACKEND_URL GitHub Secret is missing."
-            echo "Create it with your deployed backend URL, for example https://your-service.onrender.com"
+            echo "ERROR: PREM_BACKEND_URL GitHub Secret is missing."
             exit 1
           fi
+
+          echo "Backend URL is configured."
 
           mkdir -p app/src/main/java/com/prem/aiassistant
           mkdir -p app/src/main/res/values
@@ -85,8 +88,9 @@ jobs:
                   applicationId = "com.prem.aiassistant"
                   minSdk = 24
                   targetSdk = 35
-                  versionCode = 3
-                  versionName = "3.0"
+
+                  versionCode = 4
+                  versionName = "4.0"
 
                   buildConfigField(
                       "String",
@@ -132,6 +136,8 @@ jobs:
                   <item name="android:fontFamily">sans</item>
                   <item name="android:statusBarColor">#111111</item>
                   <item name="android:navigationBarColor">#111111</item>
+                  <item name="android:windowLightStatusBar">false</item>
+                  <item name="android:windowLightNavigationBar">false</item>
               </style>
           </resources>
           EOF
@@ -171,7 +177,12 @@ jobs:
           import android.os.Bundle
           import android.view.Gravity
           import android.view.View
-          import android.widget.*
+          import android.widget.Button
+          import android.widget.EditText
+          import android.widget.LinearLayout
+          import android.widget.ScrollView
+          import android.widget.TextView
+          import android.widget.Toast
           import androidx.appcompat.app.AppCompatActivity
           import org.json.JSONObject
           import java.net.HttpURLConnection
@@ -182,31 +193,44 @@ jobs:
 
               private lateinit var content: LinearLayout
 
-              private fun dp(v: Int) =
-                  (v * resources.displayMetrics.density).toInt()
+              private fun dp(value: Int): Int {
+                  return (value * resources.displayMetrics.density).toInt()
+              }
 
               private fun tv(
-                  s: String,
+                  textValue: String,
                   size: Float,
                   color: Int = Color.WHITE
-              ) = TextView(this).apply {
-                  text = s
-                  textSize = size
-                  setTextColor(color)
-                  setPadding(dp(16), dp(10), dp(16), dp(10))
+              ): TextView {
+                  return TextView(this).apply {
+                      text = textValue
+                      textSize = size
+                      setTextColor(color)
+                      setPadding(
+                          dp(16),
+                          dp(10),
+                          dp(16),
+                          dp(10)
+                      )
+                  }
               }
 
               private fun btn(
-                  s: String,
+                  textValue: String,
                   action: () -> Unit
-              ) = Button(this).apply {
-                  text = s
-                  textSize = 15f
-                  isAllCaps = false
-                  setOnClickListener { action() }
+              ): Button {
+                  return Button(this).apply {
+                      text = textValue
+                      textSize = 15f
+                      isAllCaps = false
+                      setOnClickListener {
+                          action()
+                      }
 
-                  layoutParams =
-                      LinearLayout.LayoutParams(-1, dp(54)).apply {
+                      layoutParams = LinearLayout.LayoutParams(
+                          -1,
+                          dp(54)
+                      ).apply {
                           setMargins(
                               dp(12),
                               dp(7),
@@ -214,10 +238,11 @@ jobs:
                               dp(7)
                           )
                       }
+                  }
               }
 
-              override fun onCreate(b: Bundle?) {
-                  super.onCreate(b)
+              override fun onCreate(savedInstanceState: Bundle?) {
+                  super.onCreate(savedInstanceState)
                   home()
               }
 
@@ -225,15 +250,22 @@ jobs:
 
                   val root = LinearLayout(this).apply {
                       orientation = LinearLayout.VERTICAL
-                      setBackgroundColor(Color.rgb(18, 18, 18))
+                      setBackgroundColor(
+                          Color.rgb(18, 18, 18)
+                      )
                   }
 
                   val bar = LinearLayout(this).apply {
                       gravity = Gravity.CENTER_VERTICAL
                   }
 
-                  val back = tv("‹", 34f).apply {
-                      setOnClickListener { home() }
+                  val back = tv(
+                      "‹",
+                      34f
+                  ).apply {
+                      setOnClickListener {
+                          home()
+                      }
                   }
 
                   bar.addView(
@@ -317,16 +349,13 @@ jobs:
 
                   base("🤖 AI Chat")
 
-                  val messages =
-                      LinearLayout(this).apply {
-                          orientation =
-                              LinearLayout.VERTICAL
-                      }
+                  val messages = LinearLayout(this).apply {
+                      orientation = LinearLayout.VERTICAL
+                  }
 
-                  val scroll =
-                      ScrollView(this).apply {
-                          addView(messages)
-                      }
+                  val scroll = ScrollView(this).apply {
+                      addView(messages)
+                  }
 
                   content.addView(
                       scroll,
@@ -340,27 +369,24 @@ jobs:
                   messages.addView(
                       tv(
                           "Prem AI: Namaste! 👋\n" +
-                          "Aap mujhse Hindi ya Hinglish me " +
-                          "kuch bhi pooch sakte hain.",
+                          "Aap mujhse Hindi ya Hinglish me kuch bhi pooch sakte hain.",
                           16f
                       )
                   )
 
                   val row = LinearLayout(this)
 
-                  val input =
-                      EditText(this).apply {
-                          hint = "Message likhiye..."
-                          setHintTextColor(Color.GRAY)
-                          setTextColor(Color.WHITE)
-                          setSingleLine(true)
-                      }
+                  val input = EditText(this).apply {
+                      hint = "Message likhiye..."
+                      setHintTextColor(Color.GRAY)
+                      setTextColor(Color.WHITE)
+                      setSingleLine(true)
+                  }
 
-                  val send =
-                      Button(this).apply {
-                          text = "Send"
-                          isAllCaps = false
-                      }
+                  val send = Button(this).apply {
+                      text = "Send"
+                      isAllCaps = false
+                  }
 
                   row.addView(
                       input,
@@ -383,28 +409,31 @@ jobs:
 
                   send.setOnClickListener {
 
-                      val q =
+                      val question =
                           input.text.toString().trim()
 
-                      if (q.isEmpty()) {
+                      if (question.isEmpty()) {
                           return@setOnClickListener
                       }
 
                       messages.addView(
-                          tv("You: $q", 16f)
+                          tv(
+                              "You: $question",
+                              16f
+                          )
                       )
 
                       input.text.clear()
 
                       send.isEnabled = false
 
-                      messages.addView(
-                          tv(
-                              "Prem AI: Soch raha hoon…",
-                              16f,
-                              Color.LTGRAY
-                          )
+                      val thinking = tv(
+                          "Prem AI: Soch raha hoon…",
+                          16f,
+                          Color.LTGRAY
                       )
+
+                      messages.addView(thinking)
 
                       scroll.post {
                           scroll.fullScroll(
@@ -415,17 +444,11 @@ jobs:
                       thread {
 
                           val result =
-                              callBackend(q)
+                              callBackend(question)
 
                           runOnUiThread {
 
-                              if (
-                                  messages.childCount > 0
-                              ) {
-                                  messages.removeViewAt(
-                                      messages.childCount - 1
-                                  )
-                              }
+                              messages.removeView(thinking)
 
                               messages.addView(
                                   tv(
@@ -451,38 +474,52 @@ jobs:
                   message: String
               ): String {
 
+                  var connection: HttpURLConnection? = null
+
                   try {
 
                       val base =
                           BuildConfig.BACKEND_URL
+                              .trim()
                               .trimEnd('/')
 
-                      val conn =
-                          (
-                              URL("$base/chat")
-                                  .openConnection()
+                      if (base.isEmpty() ||
+                          base == "null"
+                      ) {
+                          return "Backend URL app me configured nahi hai."
+                      }
+
+                      val url =
+                          URL("$base/chat")
+
+                      connection =
+                          url.openConnection()
                                   as HttpURLConnection
-                          )
 
-                      conn.requestMethod = "POST"
+                      connection.requestMethod = "POST"
 
-                      conn.connectTimeout = 20000
+                      connection.connectTimeout = 20000
 
-                      conn.readTimeout = 60000
+                      connection.readTimeout = 60000
 
-                      conn.setRequestProperty(
+                      connection.setRequestProperty(
                           "Content-Type",
+                          "application/json; charset=UTF-8"
+                      )
+
+                      connection.setRequestProperty(
+                          "Accept",
                           "application/json"
                       )
 
-                      conn.doOutput = true
+                      connection.doOutput = true
 
                       val body =
                           JSONObject()
                               .put("message", message)
                               .toString()
 
-                      conn.outputStream.use {
+                      connection.outputStream.use {
                           it.write(
                               body.toByteArray(
                                   Charsets.UTF_8
@@ -490,30 +527,90 @@ jobs:
                           )
                       }
 
-                      val text =
-                          conn.inputStream
-                              .bufferedReader()
-                              .use { it.readText() }
+                      val status =
+                          connection.responseCode
 
-                      val obj =
-                          JSONObject(text)
-
-                      return obj
-                          .optString("reply")
-                          .ifBlank {
-                              obj.optString(
-                                  "error",
-                                  "Unknown error"
-                              )
+                      val stream =
+                          if (status in 200..299) {
+                              connection.inputStream
+                          } else {
+                              connection.errorStream
                           }
+
+                      val responseText =
+                          stream?.bufferedReader()
+                              ?.use { it.readText() }
+                              ?: ""
+
+                      if (status !in 200..299) {
+
+                          val serverError =
+                              try {
+                                  JSONObject(responseText)
+                                      .optString(
+                                          "error"
+                                      )
+                              } catch (
+                                  _: Exception
+                              ) {
+                                  ""
+                              }
+
+                          return if (
+                              serverError.isNotBlank()
+                          ) {
+                              "Server error ($status): $serverError"
+                          } else if (
+                              responseText.isNotBlank()
+                          ) {
+                              "Server error ($status): $responseText"
+                          } else {
+                              "Server error ($status): Server ne response nahi diya."
+                          }
+                      }
+
+                      val json =
+                          try {
+                              JSONObject(responseText)
+                          } catch (
+                              _: Exception
+                          ) {
+                              null
+                          }
+
+                      val reply =
+                          json?.optString("reply")
+                              ?: ""
+
+                      if (reply.isNotBlank()) {
+                          return reply
+                      }
+
+                      val error =
+                          json?.optString("error")
+                              ?: ""
+
+                      if (error.isNotBlank()) {
+                          return "Server error: $error"
+                      }
+
+                      return if (
+                          responseText.isNotBlank()
+                      ) {
+                          responseText
+                      } else {
+                          "AI ne koi reply nahi diya."
+                      }
 
                   } catch (e: Exception) {
 
-                      return "Connection error: " +
-                          (
-                              e.message
-                                  ?: "backend se connection nahi ho paaya"
-                          )
+                      return "Connection error: ${
+                          e.message
+                              ?: "backend se connection nahi ho paaya"
+                      }"
+
+                  } finally {
+                      connection?.disconnect()
                   }
               }
 
@@ -522,32 +619,42 @@ jobs:
                   base("🎬 AI Reel Maker")
 
                   content.addView(
-                      tv("AI Reel Maker", 25f)
+                      tv(
+                          "AI Reel Maker",
+                          25f
+                      )
                   )
 
                   content.addView(
                       tv(
-                          "Story ya idea likhiye. " +
-                          "Next update me isi backend se " +
-                          "reel planning aur generation " +
-                          "workflow connect kiya ja sakta hai.",
+                          "Apni reel ka idea likhiye.",
                           16f,
                           Color.LTGRAY
                       )
                   )
 
-                  val e =
+                  val input =
                       EditText(this).apply {
+
                           hint =
                               "Example: Hanuman ji ki emotional story"
-                          setHintTextColor(Color.GRAY)
-                          setTextColor(Color.WHITE)
+
+                          setHintTextColor(
+                              Color.GRAY
+                          )
+
+                          setTextColor(
+                              Color.WHITE
+                          )
+
                           minLines = 4
-                          gravity = Gravity.TOP
+
+                          gravity =
+                              Gravity.TOP
                       }
 
                   content.addView(
-                      e,
+                      input,
                       LinearLayout.LayoutParams(
                           -1,
                           dp(130)
@@ -563,6 +670,7 @@ jobs:
 
                   content.addView(
                       btn("✨ Reel Plan Banaye") {
+
                           Toast.makeText(
                               this,
                               "Reel workflow ready.",
@@ -577,7 +685,10 @@ jobs:
                   base("🎥 AI Video Maker")
 
                   content.addView(
-                      tv("AI Video Maker", 25f)
+                      tv(
+                          "AI Video Maker",
+                          25f
+                      )
                   )
 
                   content.addView(
@@ -588,18 +699,28 @@ jobs:
                       )
                   )
 
-                  val e =
+                  val input =
                       EditText(this).apply {
+
                           hint =
                               "Video prompt likhiye..."
-                          setHintTextColor(Color.GRAY)
-                          setTextColor(Color.WHITE)
+
+                          setHintTextColor(
+                              Color.GRAY
+                          )
+
+                          setTextColor(
+                              Color.WHITE
+                          )
+
                           minLines = 4
-                          gravity = Gravity.TOP
+
+                          gravity =
+                              Gravity.TOP
                       }
 
                   content.addView(
-                      e,
+                      input,
                       LinearLayout.LayoutParams(
                           -1,
                           dp(130)
@@ -615,6 +736,7 @@ jobs:
 
                   content.addView(
                       btn("🎥 Video Generate") {
+
                           Toast.makeText(
                               this,
                               "Video workflow ready.",
@@ -626,10 +748,22 @@ jobs:
           }
           EOF
 
+      - name: Verify backend URL
+        env:
+          BACKEND_URL: ${{ secrets.PREM_BACKEND_URL }}
+        run: |
+          if [ -z "$BACKEND_URL" ]; then
+            echo "ERROR: Backend URL is empty."
+            exit 1
+          fi
+
+          echo "Backend URL configured successfully."
+
       - name: Build APK
         env:
           BACKEND_URL: ${{ secrets.PREM_BACKEND_URL }}
-        run: ./gradle-8.10.2/bin/gradle assembleDebug --no-daemon
+        run: |
+          ./gradle-8.10.2/bin/gradle assembleDebug --no-daemon
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
