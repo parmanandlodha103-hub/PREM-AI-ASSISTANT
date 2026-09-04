@@ -1,0 +1,44 @@
+const express = require("express");
+const cors = require("cors");
+const OpenAI = require("openai");
+
+const app = express();
+app.use(cors());
+app.use(express.json({ limit: "1mb" }));
+
+const port = process.env.PORT || 3000;
+
+app.get("/", (req, res) => {
+  res.json({ ok: true, service: "Prem AI Assistant backend" });
+});
+
+app.post("/chat", async (req, res) => {
+  try {
+    const message = String(req.body?.message || "").trim();
+    if (!message) return res.status(400).json({ error: "Message is required" });
+
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) return res.status(500).json({ error: "OPENAI_API_KEY is not configured on the server" });
+
+    const client = new OpenAI({ apiKey });
+
+    const response = await client.responses.create({
+      model: process.env.OPENAI_MODEL || "gpt-5.2",
+      instructions: "You are Prem AI Assistant. Reply helpfully and naturally. The user often prefers Hindi/Hinglish, so answer in the same language as the user.",
+      input: message,
+      max_output_tokens: 1200
+    });
+
+    res.json({
+      ok: true,
+      reply: response.output_text || "Sorry, mujhe abhi jawab nahi mila."
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({
+      error: err?.message || "AI request failed"
+    });
+  }
+});
+
+app.listen(port, () => console.log(`Prem AI backend running on port ${port}`));
