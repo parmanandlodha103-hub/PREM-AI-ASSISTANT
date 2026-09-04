@@ -191,6 +191,7 @@ jobs:
                   root.addView(bar)
                   content=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL}
                   root.addView(content,LinearLayout.LayoutParams(-1,0,1f))
+                  root.setPadding(0,0,0,dp(80))
                   setContentView(root)
               }
 
